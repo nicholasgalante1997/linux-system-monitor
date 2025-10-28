@@ -1,11 +1,11 @@
 use actix_cors::Cors;
 use actix_files;
 use actix_web::{
-    App, HttpServer,
+    App, HttpServer, HttpResponse, Responder,
     dev::{Service, ServiceRequest, ServiceResponse, fn_service},
-    http, middleware, web,
+    get, http, middleware, web,
 };
-use debugrs::debug;
+use debugrs::log;
 use sysinfo::{Components, Disks, Networks, System};
 
 use std::sync::{Arc, Mutex};
@@ -18,6 +18,11 @@ mod rdf;
 mod services;
 mod ui;
 mod utils;
+
+#[get("/health")]
+async fn health() -> impl Responder {
+    HttpResponse::Ok().body("OK")
+}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -50,35 +55,30 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .wrap_fn(|req, srv| {
                 let logline = format!("{} {}", req.method(), req.path());
-                debug!(log::logger(), logline);
-
+                log(logline);
                 let fut = srv.call(req);
                 async {
                     let res = fut.await?;
                     Ok(res)
                 }
             })
+            .service(health)
             .service(
                 web::scope("/api")
                     .wrap(middleware::Compress::default())
                     .configure(|config| {
-                        // HTML Routes
                         config.service(services::http_views::routes::render_overview_as_html);
                         config.service(services::http_views::routes::render_cpu_as_html);
                         config.service(services::http_views::routes::render_memory_as_html);
                         config.service(services::http_views::routes::render_disks_as_html);
                         config.service(services::http_views::routes::render_components_as_html);
                         config.service(services::http_views::routes::render_networks_as_html);
-
-                        // JSON Routes
                         config.service(services::json_views::routes::render_overview_as_json);
                         config.service(services::json_views::routes::render_system_as_json);
                         config.service(services::json_views::routes::render_cpus_as_json);
                         config.service(services::json_views::routes::render_disks_as_json);
                         config.service(services::json_views::routes::render_components_as_json);
                         config.service(services::json_views::routes::render_networks_as_json);
-
-                        // RDF Routes
                     }),
             )
             .service(

@@ -1,0 +1,28 @@
+services:
+  rs-linux-system-monitor:
+    image: linux-system-monitor:ubuntu-latest
+    container_name: docker-linux-system-monitor
+    network_mode: host
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - ./.env.example
+  ngrok:
+    image: ngrok/ngrok:latest
+    network_mode: "host"
+    volumes:
+      - ./ngrok.yml:/etc/ngrok/ngrok.yml
+    restart: unless-stopped
+    command:
+      - "start"
+      - "--all"
+      - "--config"
+      - "/etc/ngrok/ngrok.yml"
+
